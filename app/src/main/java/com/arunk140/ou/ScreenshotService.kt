@@ -75,9 +75,16 @@ class ScreenshotService : Service() {
             }, Handler(Looper.getMainLooper()))
         }
 //        captureScreen(callback)
-        Handler(Looper.getMainLooper()).postDelayed({
-            captureScreen(callback)
-        }, 1000)
+
+        captureScreen { bitmap ->
+            // Invoke callback and clear it afterward
+            screenshotCallback?.invoke(bitmap)
+            clearCallback()
+        }
+
+//        Handler(Looper.getMainLooper()).postDelayed({
+//            captureScreen(callback)
+//        }, 1000)
 
     }
 
@@ -146,5 +153,14 @@ class ScreenshotService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 12345
+        private var screenshotCallback: ((Bitmap?) -> Unit)? = null
+
+        fun registerCallback(callback: (Bitmap?) -> Unit) {
+            screenshotCallback = callback
+        }
+
+        fun clearCallback() {
+            screenshotCallback = null
+        }
     }
 }

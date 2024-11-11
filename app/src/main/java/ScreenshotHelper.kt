@@ -19,6 +19,7 @@ import android.view.WindowManager
 import android.view.WindowMetrics
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import com.arunk140.ou.ScreenshotService
 
 class ScreenshotHelper(private val activity: Activity) {
     private var screenshotCallback: ((Bitmap?) -> Unit)? = null
@@ -38,7 +39,10 @@ class ScreenshotHelper(private val activity: Activity) {
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         )
         activity.window.decorView.alpha = 0f
-
+        ScreenshotService.registerCallback{ bitmap ->
+            callback(bitmap)
+            activity.finish()
+        }
         // Launch screenshot intent
         activity.startActivityForResult(
             mediaProjectionManager?.createScreenCaptureIntent(),

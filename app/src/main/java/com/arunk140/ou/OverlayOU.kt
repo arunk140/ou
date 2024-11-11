@@ -1,7 +1,11 @@
 package com.arunk140.ou
 
 import ScreenshotHelper
+import android.R.attr.label
+import android.R.attr.text
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
@@ -9,24 +13,21 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.PixelFormat
 import android.graphics.drawable.ColorDrawable
-import android.hardware.display.DisplayManager
-import android.media.ImageReader
-import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.provider.MediaStore
+import android.util.Base64
 import android.view.Gravity
 import android.view.Window
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import java.io.ByteArrayOutputStream
+
 
 class OverlayOU : Activity() {
     private lateinit var screenshotHelper: ScreenshotHelper
@@ -51,8 +52,8 @@ class OverlayOU : Activity() {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
             // Make the background semi-transparent
-//            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-//            attributes.dimAmount = 0.6f
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            attributes.dimAmount = 0.6f
 
             // Make sure this activity appears above the lockscreen
             addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
@@ -86,10 +87,6 @@ class OverlayOU : Activity() {
                         // Show our overlay again
                         window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
                         window.decorView.alpha = 1f
-
-                        saveBitmapToGallery(it)
-                        Toast.makeText(this@OverlayOU,
-                            "Screenshot saved!", Toast.LENGTH_SHORT).show()
                     }
                 }
                 dataCache = null
@@ -103,10 +100,19 @@ class OverlayOU : Activity() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     private fun takeScreenshot() {
+        window.apply {
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            attributes.dimAmount = 0f
+        }
         screenshotHelper.takeScreenshot { bitmap ->
             bitmap?.let {
-                saveBitmapToGallery(it)
-                Toast.makeText(this, "Screenshot saved!", Toast.LENGTH_SHORT).show()
+//                saveBitmapToGallery(it)
+                val b64 = bitmapToBase64(it, 80, 20)
+                Toast.makeText(this, "Response copied to clipboard!", Toast.LENGTH_SHORT).show()
+                val clipboard: ClipboardManager =
+                    getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("image base64", b64?.length.toString())
+                clipboard.setPrimaryClip(clip)
             } ?: run {
                 Toast.makeText(this, "Failed to take screenshot", Toast.LENGTH_SHORT).show()
             }
@@ -152,9 +158,13 @@ class OverlayOU : Activity() {
         }
     }
 
+    private var isSavingScreenshot = false
 
-
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveBitmapToGallery(bitmap: Bitmap) {
+        if (isSavingScreenshot) return
+        isSavingScreenshot = true
+
         val filename = "Screenshot_${System.currentTimeMillis()}.jpg"
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
@@ -168,5 +178,32 @@ class OverlayOU : Activity() {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
             }
         }
+        isSavingScreenshot = false
     }
+}
+
+fun bitmapToBase64(bitmap: Bitmap, quality: Int): String? {
+    val byteArrayOutputStream = ByteArrayOutputStream()
+    // Compress bitmap with the specified quality
+    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, byteArrayOutputStream)
+    val byteArray = byteArrayOutputStream.toByteArray()
+    // Convert byte array to Base64 string
+    return Base64.encodeToString(byteArray, Base64.DEFAULT)
+}
+
+fun bitmapToBase64(bitmap: Bitmap, quality: Int, scalePercent: Int): String? {
+    // Calculate new width and height, preserving aspect ratio
+    val newWidth = (bitmap.width * scalePercent / 100.0).toInt()
+    val newHeight = (bitmap.height * scalePercent / 100.0).toInt()
+
+    // Scale the bitmap
+    val scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+
+    val byteArrayOutputStream = ByteArrayOutputStream()
+    // Compress scaled bitmap with the specified quality
+    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, byteArrayOutputStream)
+    val byteArray = byteArrayOutputStream.toByteArray()
+
+    // Convert byte array to Base64 string
+    return Base64.encodeToString(byteArray, Base64.DEFAULT)
 }
